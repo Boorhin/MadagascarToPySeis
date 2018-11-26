@@ -11,16 +11,13 @@ def getData (Dir, File, Header):
     TrHead= np.array(TrH)
     return Data, TrHead
 
-def WriteRsf(Array, Dir, Name, Tsample, Rspacing):
+def WriteRsf(Array, Dir, Name, *axis):
     '''Writes numpy array and its mask into optimised rsf file'''
-    n1,n2,n3 = np.shape(Array)
     Out      = m8r.Output(Dir+os.sep+Name)
     Mask_Out = m8r.Output(Dir+os.sep+'Mask_'+Name)
-    # array gets transposed in rsf
-    axis = [{'n':n3,'d':Tsample,'o':0,'l':'Time','u':'s'},
-            {'n':n2,'d':Rspacing,'o':0,'l':'Offset','u':'m'},
-            {'n':n1,'d':1,'o':0,'l':'Shot','u':''}]
+    dim = np.shape(Array)[::-1] #Rsf transposed compared to numpy
     for i in range(len(axis)):
+        axis[i]['n']=dim[i]
         Out.putaxis(axis[i], i+1)
         Mask_Out.putaxis(axis[i], i+1)    
     Out.write(Array.data)
@@ -62,9 +59,9 @@ for m in range(len(Files)):
 
 # This allows you to add traces in missing tape data without using the headers
 #### Data consolidation
-Receivers= H[0][0,-13]
+Receivers= H[0][0,-13]#Nb receivers per shot in header bin -13
 Nh = len(H[0][0])
-S = H[0][0,38]
+S = H[0][0,38]#Nb samples in header bin 38 here assuming constant sampling in the survey
 CorrTr = [0,2,0,0,13] ##L[1] missing 2 traces L[4] missing 13 traces QC might be done directly from trace headers?
 Tr = sum(TT+CorrTr)
 Geom =(Tr/Receivers,S, Receivers) ## assuming first shot is correct
@@ -75,6 +72,12 @@ Cube, TraceH = MakeData(L, H, CorrTr, Cube, TraceH, S, Nh, Receivers)
 
 ### ... do some stuff with your data
 
-#Export back to rsf
-WriteRsf(Cube.transpose(0,2,1), Dir, 'Cube_test', Tsample=0.004, Rspacing=50) #Cube in Shot Time Offset needs ordering before export
+###Export back to rsf
+#define your axis
+Tsample=0.004
+Rspacing=50
+axis = [{'d':Tsample,'o':0,'l':'Time','u':'s'},
+            {'d':Rspacing,'o':0,'l':'Offset','u':'m'},
+            {'d':1,'o':0,'l':'Shot','u':''}]#Rsf first axis should be time for memory access
+WriteRsf(Cube.transpose(0,2,1), Dir, 'Cube_test', *axis) #Cube in Shot Time Offset needs ordering before export
 WriteRsf(TraceH.transpose(0,2,1), Dir, 'Trace_test', Tsample=1, Rspacing=1)
